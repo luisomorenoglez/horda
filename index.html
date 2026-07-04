@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HORDA — tributo a Gauntlet</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="wrapper">
+    <div id="topbar">
+      <div class="hud"><span class="label">SALUD</span><span id="hud-hp">500</span></div>
+      <div class="hud"><span class="label">PUNTOS</span><span id="hud-score">0</span></div>
+      <div class="hud"><span class="label">LLAVES</span><span id="hud-keys">0</span></div>
+      <div class="hud"><span class="label">POCIONES</span><span id="hud-potions">0</span></div>
+      <div class="hud"><span class="label">NIVEL</span><span id="hud-level">1</span></div>
+      <div class="hud"><span class="label">RÉCORD</span><span id="hud-best">0</span></div>
+    </div>
+    <div id="stage">
+      <canvas id="game" width="720" height="528"></canvas>
+      <div id="overlay">
+        <div id="title-screen">
+          <h1>HORDA</h1>
+          <p class="tagline">los generadores no descansan. tú tampoco.</p>
+          <p class="pick">elige a tu héroe</p>
+          <div id="classes"></div>
+          <p class="hint">muévete con WASD/flechas · dispara con ESPACIO · poción con E</p>
+        </div>
+      </div>
+    </div>
+    <p id="footer">un tributo a Gauntlet · la salud baja sola: come o muere</p>
+  </div>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
