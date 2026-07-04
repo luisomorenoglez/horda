@@ -101,6 +101,14 @@ export function generateLevel(seed, depth) {
     }
   }
 
+  // La Muerte: a partir del nivel 3 puede rondar una por mazmorra.
+  // Es inmune a los disparos y solo se sacia drenándote la vida.
+  if (depth >= 3 && rng() < 0.5 && rooms.length > 2) {
+    const room = rooms[randInt(rng, 1, rooms.length - 1)];
+    const s = spot(room);
+    if (s) spawns.enemies.push({ ...s, kind: "death" });
+  }
+
   return {
     grid,
     rooms,

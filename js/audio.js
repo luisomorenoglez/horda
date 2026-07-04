@@ -25,8 +25,24 @@ function blip(freq, endFreq, dur, type = "square", vol = 0.06) {
   }
 }
 
+// Voz del narrador estilo arcade, con la síntesis de voz del navegador.
+export function say(text) {
+  try {
+    if (!window.speechSynthesis) return;
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = "es-ES";
+    u.rate = 1.02;
+    u.pitch = 0.5;
+    u.volume = 0.85;
+    speechSynthesis.speak(u);
+  } catch (_) {
+    // sin voz también se juega
+  }
+}
+
 export const sfx = {
   shoot: () => blip(880, 220, 0.08),
+  clank: () => blip(2400, 1800, 0.05, "square", 0.05),
   hit: () => blip(200, 80, 0.1, "sawtooth"),
   kill: () => blip(300, 60, 0.18, "sawtooth", 0.07),
   pickup: () => blip(660, 1320, 0.12),

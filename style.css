@@ -36,6 +36,7 @@ body {
 .hud .label { color: var(--dim); font-size: 10px; letter-spacing: 2px; }
 .hud span:last-child { font-size: 18px; font-weight: bold; color: var(--gold); }
 #hud-hp { color: #60c060 !important; }
+#hud-hero canvas { display: block; margin-top: 2px; image-rendering: pixelated; }
 #hud-hp.low { color: var(--blood) !important; animation: blink 0.6s infinite; }
 
 @keyframes blink { 50% { opacity: 0.3; } }

@@ -1,6 +1,8 @@
 import { TILE } from "./game.js";
 import { T, MAP_W, MAP_H } from "./level.js";
-import { getSprite, getTile } from "./sprites.js";
+import { getSprite, getCharSprite, getWeapon, getTile, themeCount } from "./sprites.js";
+
+const WEAPONS = { guerrero: "axe", valquiria: "sword", mago: "fire", elfo: "arrow" };
 
 const VIEW_W = 720;
 const VIEW_H = 528;
@@ -19,16 +21,19 @@ export function render(ctx, g, time) {
   const x1 = Math.min(MAP_W - 1, Math.ceil((camX + VIEW_W) / TILE));
   const y1 = Math.min(MAP_H - 1, Math.ceil((camY + VIEW_H) / TILE));
 
+  // la mazmorra cambia de color al bajar, como en el arcade
+  const theme = (g.depth - 1) % themeCount();
+
   for (let ty = y0; ty <= y1; ty++) {
     for (let tx = x0; tx <= x1; tx++) {
       const t = g.map[ty][tx];
       const dx = tx * TILE - camX;
       const dy = ty * TILE - camY;
-      if (t === T.WALL) ctx.drawImage(getTile("wall", TILE), dx, dy);
+      if (t === T.WALL) ctx.drawImage(getTile("wall", TILE, theme), dx, dy);
       else {
-        ctx.drawImage(getTile("floor", TILE), dx, dy);
-        if (t === T.DOOR) ctx.drawImage(getTile("door", TILE), dx, dy);
-        else if (t === T.EXIT) ctx.drawImage(getTile("exit", TILE), dx, dy);
+        ctx.drawImage(getTile("floor", TILE, theme), dx, dy);
+        if (t === T.DOOR) ctx.drawImage(getTile("door", TILE, theme), dx, dy);
+        else if (t === T.EXIT) ctx.drawImage(getTile("exit", TILE, theme), dx, dy);
       }
     }
   }
@@ -45,30 +50,42 @@ export function render(ctx, g, time) {
     ctx.drawImage(getSprite(`gen_${gen.kind}`, SPRITE), gen.x - s / 2 - camX, gen.y - s / 2 - camY, s, s);
   }
 
+  // enemigos: animados al andar, mirando hacia donde van
   for (const e of g.enemies) {
-    ctx.drawImage(getSprite(e.kind, SPRITE), e.x - SPRITE / 2 - camX, e.y - SPRITE / 2 - camY + bob);
-  }
-
-  // disparos
-  for (const s of g.shots) {
-    ctx.fillStyle = "#f0e8a0";
-    ctx.beginPath();
-    ctx.arc(s.x - camX, s.y - camY, 3.5, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  for (const s of g.enemyShots) {
-    ctx.fillStyle = "#f06030";
-    ctx.beginPath();
-    ctx.arc(s.x - camX, s.y - camY, 4, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  // jugador (parpadea al recibir daño)
-  if (g.hurtFlash <= 0 || Math.floor(time / 60) % 2 === 0) {
+    const frame = e.moving ? Math.floor(time / 150) % 2 : 0;
+    const eBob = e.kind === "ghost" ? bob : e.moving && frame === 1 ? -1 : 0;
     ctx.drawImage(
-      getSprite(`hero_${g.classId}`, SPRITE),
-      g.player.x - SPRITE / 2 - camX,
-      g.player.y - SPRITE / 2 - camY
+      getCharSprite(e.kind, e.face, frame, SPRITE),
+      e.x - SPRITE / 2 - camX,
+      e.y - SPRITE / 2 - camY + eBob
+    );
+  }
+
+  // disparos: el arma de cada héroe girando en el aire
+  const weapon = getWeapon(WEAPONS[g.classId], 18);
+  for (const s of g.shots) {
+    const spin = WEAPONS[g.classId] === "arrow"
+      ? Math.atan2(s.vy, s.vx) // la flecha apunta a donde vuela
+      : time / 80; // hacha y espada dan vueltas
+    ctx.save();
+    ctx.translate(s.x - camX, s.y - camY);
+    ctx.rotate(spin);
+    ctx.drawImage(weapon, -9, -9);
+    ctx.restore();
+  }
+  const fireball = getWeapon("fire", 16);
+  for (const s of g.enemyShots) {
+    ctx.drawImage(fireball, s.x - 8 - camX, s.y - 8 - camY);
+  }
+
+  // jugador: animado, mirando a su dirección (parpadea al recibir daño)
+  if (g.hurtFlash <= 0 || Math.floor(time / 60) % 2 === 0) {
+    const p = g.player;
+    const frame = p.moving ? Math.floor(time / 140) % 2 : 0;
+    ctx.drawImage(
+      getCharSprite(`hero_${g.classId}`, p.facing, frame, SPRITE),
+      p.x - SPRITE / 2 - camX,
+      p.y - SPRITE / 2 - camY + (p.moving && frame === 1 ? -1 : 0)
     );
   }
 

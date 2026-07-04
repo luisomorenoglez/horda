@@ -80,6 +80,9 @@ function showTitle() {
 function startGame(classId) {
   game = newGame(classId);
   overlay.classList.add("hidden");
+  const slot = document.getElementById("hud-hero");
+  slot.innerHTML = "";
+  slot.appendChild(getSprite(`hero_${classId}`, 22));
 }
 
 function showDeath() {

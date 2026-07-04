@@ -1,5 +1,5 @@
 import { generateLevel, T, MAP_W, MAP_H } from "./level.js";
-import { sfx } from "./audio.js";
+import { sfx, say } from "./audio.js";
 
 export const TILE = 32;
 
@@ -26,6 +26,7 @@ const ENEMIES = {
   ghost: { hp: 2, speed: 70, dmg: 8, points: 10, kamikaze: true },
   grunt: { hp: 4, speed: 59, dmg: 5, points: 20, kamikaze: false },
   demon: { hp: 6, speed: 48, dmg: 6, points: 50, kamikaze: false, ranged: true },
+  death: { hp: 9999, speed: 62, dmg: 0, points: 0, kamikaze: false, drain: true },
 };
 
 const MAX_ENEMIES = 40;
@@ -44,7 +45,7 @@ export function newGame(classId) {
     potions: 1,
     hp: 500,
     maxHp: 999,
-    player: { x: 0, y: 0, size: PLAYER_SIZE, fx: 1, fy: 0 }, // fx/fy = dirección de disparo
+    player: { x: 0, y: 0, size: PLAYER_SIZE, fx: 1, fy: 0, facing: "down", moving: false },
     enemies: [],
     generators: [],
     items: [],
@@ -58,6 +59,8 @@ export function newGame(classId) {
     over: false,
     levelBanner: 0,
     messages: [],
+    lastHungerWarn: 0,
+    time: 0,
   };
   nextLevel(g);
   return g;
@@ -103,8 +106,10 @@ function spawnEnemy(g, kind, x, y, hpScale = 1 + (g.depth - 1) * 0.18) {
     speed: base.speed * (1 + (g.depth - 1) * 0.04),
     dmg: base.dmg, points: base.points,
     kamikaze: base.kamikaze, ranged: !!base.ranged,
+    drain: !!base.drain, drainLeft: 150, drainTick: 0,
     hitCd: 0, shootCd: 1000 + Math.random() * 1500,
     wobble: Math.random() * Math.PI * 2,
+    face: "down", moving: false,
   });
 }
 
@@ -185,12 +190,17 @@ function updatePlayer(g, input, dt) {
   if (input.left) dx -= 1;
   if (input.right) dx += 1;
 
-  if (dx !== 0 || dy !== 0) {
+  p.moving = dx !== 0 || dy !== 0;
+  if (p.moving) {
     const len = Math.hypot(dx, dy);
     const v = (g.cls.speed * dt) / 1000;
     moveEntity(g, p, (dx / len) * v, (dy / len) * v, true);
     p.fx = dx;
     p.fy = dy;
+    p.facing =
+      Math.abs(dx) >= Math.abs(dy)
+        ? (dx > 0 ? "right" : "left")
+        : (dy > 0 ? "down" : "up");
   }
 
   // disparo
@@ -213,7 +223,8 @@ function updatePlayer(g, input, dt) {
       g.potions--;
       g.bombFlash = 300;
       sfx.potion();
-      for (const e of g.enemies) e.hp -= 10;
+      // La poción es lo único que acaba con la Muerte.
+      for (const e of g.enemies) e.hp = e.drain ? 0 : e.hp - 10;
       for (const gen of g.generators) gen.hp -= 2;
       reapDead(g);
     }
@@ -261,9 +272,13 @@ function updateShots(g, dt) {
     let consumed = false;
     for (const e of g.enemies) {
       if (Math.hypot(e.x - s.x, e.y - s.y) < e.size / 2 + 4) {
-        e.hp -= g.cls.dmg;
+        if (e.drain) {
+          sfx.clank(); // los disparos rebotan en la Muerte
+        } else {
+          e.hp -= g.cls.dmg;
+          sfx.hit();
+        }
         consumed = true;
-        sfx.hit();
         break;
       }
     }
@@ -272,6 +287,20 @@ function updateShots(g, dt) {
         if (Math.hypot(gen.x - s.x, gen.y - s.y) < TILE * 0.5) {
           gen.hp -= g.cls.dmg;
           consumed = true;
+          sfx.hit();
+          break;
+        }
+      }
+    }
+    // Como en el arcade: los disparos destruyen la comida.
+    if (!consumed) {
+      for (let j = g.items.length - 1; j >= 0; j--) {
+        const it = g.items[j];
+        if (it.kind === "food" && Math.hypot(it.x - s.x, it.y - s.y) < TILE * 0.4) {
+          g.items.splice(j, 1);
+          consumed = true;
+          toast(g, "¡HAS DESTRUIDO LA COMIDA!");
+          say("Has destruido la comida");
           sfx.hit();
           break;
         }
@@ -307,6 +336,7 @@ function updateEnemies(g, dt) {
   for (let i = g.enemies.length - 1; i >= 0; i--) {
     const e = g.enemies[i];
     const dist = Math.hypot(p.x - e.x, p.y - e.y);
+    e.moving = false;
 
     // contacto
     e.hitCd -= dt;
@@ -314,6 +344,25 @@ function updateEnemies(g, dt) {
       if (e.kamikaze) {
         damagePlayer(g, e.dmg);
         g.enemies.splice(i, 1);
+        continue;
+      }
+      if (e.drain) {
+        // La Muerte te agarra y drena vida hasta saciarse.
+        e.drainTick -= dt;
+        if (e.drainTick <= 0) {
+          e.drainTick = 100;
+          const bite = Math.min(3, e.drainLeft);
+          g.hp -= bite; // ignora la armadura, como debe ser
+          e.drainLeft -= bite;
+          g.hurtFlash = 150;
+          if (e.drainLeft % 30 === 0) sfx.hurt();
+          checkDeath(g);
+          if (e.drainLeft <= 0) {
+            g.enemies.splice(i, 1);
+            toast(g, "LA MUERTE SE HA SACIADO");
+            continue;
+          }
+        }
         continue;
       }
       if (e.hitCd <= 0) {
@@ -337,6 +386,11 @@ function updateEnemies(g, dt) {
         dy += Math.sin(e.wobble) * v * 0.5;
       }
       moveEntity(g, e, dx, dy);
+      e.moving = true;
+      e.face =
+        Math.abs(dx) >= Math.abs(dy)
+          ? (dx > 0 ? "right" : "left")
+          : (dy > 0 ? "down" : "up");
     }
 
     // demonios lanzan proyectiles
@@ -352,6 +406,29 @@ function updateEnemies(g, dt) {
           dmg: e.dmg,
         });
       }
+    }
+  }
+
+  separateEnemies(g);
+}
+
+// Que la horda no se apile: los enemigos que se solapan se empujan.
+function separateEnemies(g) {
+  const es = g.enemies;
+  for (let i = 0; i < es.length; i++) {
+    for (let j = i + 1; j < es.length; j++) {
+      const a = es[i];
+      const b = es[j];
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const dist = Math.hypot(dx, dy);
+      const min = (a.size + b.size) / 2 - 2;
+      if (dist >= min || dist === 0) continue;
+      const push = (min - dist) / 2;
+      const nx = dx / dist;
+      const ny = dy / dist;
+      moveEntity(g, a, -nx * push, -ny * push);
+      moveEntity(g, b, nx * push, ny * push);
     }
   }
 }
@@ -402,6 +479,13 @@ function drainHealth(g, dt) {
     g.hp--;
     checkDeath(g);
   }
+  // El aviso clásico cuando queda poca vida.
+  g.time += dt;
+  if (!g.over && g.hp > 0 && g.hp < 100 && g.time - g.lastHungerWarn > 15000) {
+    g.lastHungerWarn = g.time;
+    toast(g, `${g.cls.name} NECESITA COMIDA... URGENTEMENTE`);
+    say(`${g.cls.name} necesita comida, urgentemente`);
+  }
 }
 
 function checkDeath(g) {
@@ -409,6 +493,7 @@ function checkDeath(g) {
     g.hp = 0;
     g.over = true;
     sfx.die();
+    say("Has muerto");
     const best = Number(localStorage.getItem("horda_best") || 0);
     if (g.score > best) localStorage.setItem("horda_best", String(g.score));
   }
