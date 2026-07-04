@@ -1,36 +1,36 @@
 import { generateLevel, T, MAP_W, MAP_H } from "./level.js";
 import { sfx } from "./audio.js";
 
-export const TILE = 24;
+export const TILE = 32;
 
 export const CLASSES = {
   guerrero: {
     name: "GUERRERO", desc: "pega fuerte, dispara lento", color: "#b03030",
-    speed: 100, dmg: 3, fireRate: 420, shotSpeed: 250, armor: 0.75,
+    speed: 135, dmg: 3, fireRate: 420, shotSpeed: 335, armor: 0.75,
   },
   valquiria: {
     name: "VALQUIRIA", desc: "la mejor armadura", color: "#e8c840",
-    speed: 105, dmg: 2, fireRate: 340, shotSpeed: 280, armor: 0.6,
+    speed: 140, dmg: 2, fireRate: 340, shotSpeed: 375, armor: 0.6,
   },
   mago: {
     name: "MAGO", desc: "magia rápida, piel de papel", color: "#8040c0",
-    speed: 105, dmg: 3, fireRate: 280, shotSpeed: 330, armor: 1.0,
+    speed: 140, dmg: 3, fireRate: 280, shotSpeed: 440, armor: 1.0,
   },
   elfo: {
     name: "ELFO", desc: "el más veloz", color: "#40a050",
-    speed: 140, dmg: 2, fireRate: 260, shotSpeed: 320, armor: 0.9,
+    speed: 185, dmg: 2, fireRate: 260, shotSpeed: 425, armor: 0.9,
   },
 };
 
 const ENEMIES = {
-  ghost: { hp: 2, speed: 52, dmg: 8, points: 10, kamikaze: true },
-  grunt: { hp: 4, speed: 44, dmg: 5, points: 20, kamikaze: false },
-  demon: { hp: 6, speed: 36, dmg: 6, points: 50, kamikaze: false, ranged: true },
+  ghost: { hp: 2, speed: 70, dmg: 8, points: 10, kamikaze: true },
+  grunt: { hp: 4, speed: 59, dmg: 5, points: 20, kamikaze: false },
+  demon: { hp: 6, speed: 48, dmg: 6, points: 50, kamikaze: false, ranged: true },
 };
 
 const MAX_ENEMIES = 40;
-const PLAYER_SIZE = 16;
-const ENEMY_SIZE = 16;
+const PLAYER_SIZE = 20;
+const ENEMY_SIZE = 20;
 const DRAIN_MS = 1000; // -1 de salud por segundo: la esencia de Gauntlet
 
 export function newGame(classId) {
@@ -347,8 +347,8 @@ function updateEnemies(g, dt) {
         const len = Math.hypot(p.x - e.x, p.y - e.y) || 1;
         g.enemyShots.push({
           x: e.x, y: e.y,
-          vx: ((p.x - e.x) / len) * 170,
-          vy: ((p.y - e.y) / len) * 170,
+          vx: ((p.x - e.x) / len) * 230,
+          vy: ((p.y - e.y) / len) * 230,
           dmg: e.dmg,
         });
       }

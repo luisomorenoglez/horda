@@ -4,7 +4,7 @@ import { getSprite, getTile } from "./sprites.js";
 
 const VIEW_W = 720;
 const VIEW_H = 528;
-const SPRITE = 20; // los sprites son algo menores que el tile
+const SPRITE = TILE; // el arte 16x16 ya trae sus márgenes
 
 export function render(ctx, g, time) {
   ctx.fillStyle = "#000";
@@ -28,7 +28,7 @@ export function render(ctx, g, time) {
       else {
         ctx.drawImage(getTile("floor", TILE), dx, dy);
         if (t === T.DOOR) ctx.drawImage(getTile("door", TILE), dx, dy);
-        else if (t === T.EXIT) ctx.drawImage(getSprite("exit", SPRITE), dx + 2, dy + 2);
+        else if (t === T.EXIT) ctx.drawImage(getTile("exit", TILE), dx, dy);
       }
     }
   }
@@ -42,7 +42,7 @@ export function render(ctx, g, time) {
   for (const gen of g.generators) {
     const pulse = 1 + Math.sin(time / 250) * 0.08;
     const s = SPRITE * pulse;
-    ctx.drawImage(getSprite("generator", SPRITE), gen.x - s / 2 - camX, gen.y - s / 2 - camY, s, s);
+    ctx.drawImage(getSprite(`gen_${gen.kind}`, SPRITE), gen.x - s / 2 - camX, gen.y - s / 2 - camY, s, s);
   }
 
   for (const e of g.enemies) {
