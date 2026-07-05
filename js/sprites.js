@@ -153,6 +153,69 @@ const SHAPES = {
     ],
     palette: { R: "#c03828", Y: "#f0d020", W: "#f0f0e0", D: "#801818" },
   },
+  lobber: {
+    rows: [
+      "................",
+      "................",
+      ".....LLLLLL.....",
+      "....LLLLLLLL....",
+      "...LLEELLEELL...",
+      "...LLLLLLLLLL...",
+      "..LLLLLLLLLLLL..",
+      ".CLLLLLLLLLLLLC.",
+      ".C.LLLLLLLLLL.C.",
+      "..LLLLLLLLLLLL..",
+      "..LLLLLLLLLLLL..",
+      "...LLLLLLLLLL...",
+      "..LLL.LLLL.LLL..",
+      "................",
+      "................",
+      "................",
+    ],
+    palette: { L: "#4a9a40", E: "#f0e030", C: "#2f6a28" },
+  },
+  sorcerer: {
+    rows: [
+      "......KKKK......",
+      ".....KKKKKK.....",
+      "....KKKKKKKK....",
+      "....KPPPPPPK....",
+      "....KPEPPEPK....",
+      "....KPPPPPPK....",
+      "....KKKKKKKK....",
+      "...KKKKKKKKKK...",
+      "..KKKKKKKKKKKK..",
+      ".SKKKKKKKKKKKKS.",
+      ".S.KKKKKKKKKK.S.",
+      "...KKKKKKKKKK...",
+      "...KKKKKKKKKK...",
+      "..KKKK..KKKK....",
+      "................",
+      "................",
+    ],
+    palette: { K: "#4a2a6a", P: "#201430", E: "#e050e0", S: "#c0a080" },
+  },
+  ogre: {
+    rows: [
+      "................",
+      "....OOOOOOOO....",
+      "...OOOOOOOOOO...",
+      "...OEEOOOOEEO...",
+      "...OOOOOOOOOO...",
+      "....OTTTTTTO....",
+      "..OOOOOOOOOOOO..",
+      ".OOOOOOOOOOOOOO.",
+      ".OO.OOOOOOOO.OO.",
+      ".OO.OOOOOOOO.OO.",
+      "....OOOOOOOO....",
+      "....OOO..OOO....",
+      "....OO....OO....",
+      "...BBB....BBB...",
+      "................",
+      "................",
+    ],
+    palette: { O: "#8a7a5a", E: "#c03020", T: "#e8e0c8", B: "#3a3228" },
+  },
   death: {
     rows: [
       "................",
@@ -215,6 +278,69 @@ const SHAPES = {
       "................",
     ],
     palette: { D: "#4a3520", B: "#7a5a34", K: "#140f08" },
+  },
+  gen_lobber: {
+    rows: [
+      "................",
+      "................",
+      "................",
+      "......LLLL......",
+      "....LLLLLLLL....",
+      "...LCCLLLLCCL...",
+      "..LLLLLLLLLLLL..",
+      ".LLLCCLLLLCCLLL.",
+      ".LLLLLLLLLLLLLL.",
+      "..LLLLLLLLLLLL..",
+      "...LLLLLLLLLL...",
+      "................",
+      "................",
+      "................",
+      "................",
+      "................",
+    ],
+    palette: { L: "#3a7a32", C: "#8fd060" },
+  },
+  gen_sorcerer: {
+    rows: [
+      "................",
+      ".......KK.......",
+      "......KKKK......",
+      "......KEEK......",
+      "......KKKK......",
+      ".....KKKKKK.....",
+      ".....KKKKKK.....",
+      "....KKKKKKKK....",
+      "....KKKKKKKK....",
+      "...KKKKKKKKKK...",
+      "..EKKKKKKKKKKE..",
+      "................",
+      "................",
+      "................",
+      "................",
+      "................",
+    ],
+    palette: { K: "#4a2a6a", E: "#e050e0" },
+  },
+  gen_ogre: {
+    rows: [
+      "................",
+      "................",
+      ".....OOOOOO.....",
+      "...OOOOOOOOOO...",
+      "..OOOOOOOOOOOO..",
+      ".OOOKKKKKKKOOO..",
+      ".OOOK.....KOOO..",
+      ".OOOK.....KOOO..",
+      ".OOOOOOOOOOOOO..",
+      "OOOOOOOOOOOOOOOO",
+      "................",
+      "................",
+      "................",
+      "................",
+      "................",
+      "................",
+    ],
+    palette: { O: "#7a7468", K: "#141210" },
   },
   gen_demon: {
     rows: [
@@ -418,6 +544,13 @@ export function getWeapon(kind, size) {
     grad.addColorStop(1, "rgba(200,40,20,0)");
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, size, size);
+  } else if (kind === "lob") {
+    const grad = ctx.createRadialGradient(size / 2, size / 2, u, size / 2, size / 2, size / 2);
+    grad.addColorStop(0, "#d0f090");
+    grad.addColorStop(0.5, "#50a030");
+    grad.addColorStop(1, "rgba(30,80,20,0)");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, size, size);
   } else if (kind === "arrow") {
     ctx.fillStyle = "#8a6a40"; // astil horizontal
     ctx.fillRect(u, 5.4 * u, 8 * u, 1.2 * u);
@@ -467,7 +600,7 @@ export function getTile(kind, size, themeIdx = 0) {
     ctx.fillStyle = t.wallLo; // sombra inferior y derecha
     ctx.fillRect(u, size - 3 * u, size - 2 * u, 2 * u);
     ctx.fillRect(size - 3 * u, u, 2 * u, size - 2 * u);
-  } else if (kind === "floor") {
+  } else if (kind === "floor" || kind === "floor_a" || kind === "floor_b") {
     ctx.fillStyle = t.floor;
     ctx.fillRect(0, 0, size, size);
     ctx.fillStyle = t.joint;
@@ -478,6 +611,20 @@ export function getTile(kind, size, themeIdx = 0) {
     ctx.fillStyle = t.spark;
     ctx.fillRect(2 * u, 2 * u, 3 * u, u);
     ctx.fillRect(10 * u, 9 * u, 3 * u, u);
+    if (kind === "floor_a") {
+      // losa agrietada
+      ctx.fillStyle = t.joint;
+      ctx.fillRect(4 * u, 3 * u, u, 3 * u);
+      ctx.fillRect(5 * u, 6 * u, u, 2 * u);
+      ctx.fillRect(6 * u, 8 * u, u, 3 * u);
+      ctx.fillRect(11 * u, 11 * u, 3 * u, u);
+    } else if (kind === "floor_b") {
+      // losa desgastada, un punto más clara
+      ctx.fillStyle = "rgba(255,255,255,0.05)";
+      ctx.fillRect(u, u, size - 2 * u, size - 2 * u);
+      ctx.fillStyle = t.spark;
+      ctx.fillRect(5 * u, 12 * u, 4 * u, u);
+    }
   } else if (kind === "door") {
     ctx.drawImage(getTile("floor", size, themeIdx), 0, 0);
     ctx.fillStyle = "#181008";

@@ -31,11 +31,38 @@ window.addEventListener("keydown", (e) => {
     input[KEYMAP[e.key]] = true;
   } else if (e.key === "e" || e.key === "E") {
     input.potion = true;
+  } else if (e.key === "p" || e.key === "P" || e.key === "Escape") {
+    togglePause();
   } else if ((e.key === "r" || e.key === "R") && game && game.over) {
     showTitle();
   } else if (/^[1-4]$/.test(e.key) && !game) {
     startGame(Object.keys(CLASSES)[Number(e.key) - 1]);
   }
+});
+
+// ---- pausa ----
+
+let paused = false;
+
+function togglePause() {
+  if (!game || game.over) return;
+  paused = !paused;
+  if (paused) {
+    overlay.classList.remove("hidden");
+    overlay.innerHTML = `
+      <div>
+        <h2 class="level">PAUSA</h2>
+        <p class="sub">pulsa <b>P</b> o el botón para continuar</p>
+      </div>
+    `;
+  } else {
+    overlay.classList.add("hidden");
+  }
+}
+
+document.getElementById("btn-pause").addEventListener("click", (e) => {
+  e.currentTarget.blur(); // que el espacio no reactive el botón
+  togglePause();
 });
 
 window.addEventListener("keyup", (e) => {
@@ -79,6 +106,7 @@ function showTitle() {
 
 function startGame(classId) {
   game = newGame(classId);
+  paused = false;
   overlay.classList.add("hidden");
   const slot = document.getElementById("hud-hero");
   slot.innerHTML = "";
@@ -108,11 +136,12 @@ function loop(now) {
   last = now;
 
   if (game) {
-    update(game, input, dt);
+    if (!paused) update(game, input, dt);
     render(ctx, game, now);
     renderHud(game);
     if (game.over && !deathShown) {
       deathShown = true;
+      paused = false;
       showDeath();
     }
     if (!game.over) deathShown = false;

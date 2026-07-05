@@ -12,7 +12,7 @@ Elige uno de los 4 héroes y desciende por niveles generados proceduralmente. La
 
 - **Tu salud baja sola, un punto por segundo.** La comida 🍗 es tu única salvación.
 - Los **generadores** escupen enemigos sin parar hasta que los destruyes.
-- Los fantasmas explotan al tocarte, los orcos pegan y los demonios lanzan bolas de fuego.
+- Un bestiario que crece al bajar: fantasmas kamikaze, orcos, **lanzadores** que tiran por encima de los muros y huyen si te acercas, demonios con bolas de fuego, **hechiceros** que se desvanecen a intervalos (invisibles = intocables) y **ogros** enormes que pegan como un camión.
 - **Tus disparos destruyen la comida.** Apunta con cuidado o pasa hambre.
 - A partir del nivel 3 puede rondar **La Muerte**: inmune a tus armas, te agarra y te drena la vida hasta saciarse. Solo una poción acaba con ella.
 - Las **llaves** abren puertas; las **pociones** (tecla E) arrasan todo lo que hay en pantalla.
@@ -35,6 +35,7 @@ Elige uno de los 4 héroes y desciende por niveles generados proceduralmente. La
 | `WASD` / flechas | Moverse (8 direcciones) |
 | `Espacio` | Disparar en la dirección de movimiento |
 | `E` | Usar poción (bomba de pantalla) |
+| `P` / `Esc` | Pausa (también con el botón del HUD) |
 | `R` | Volver a empezar (tras morir) |
 | `1-4` | Elegir héroe en el título |
 

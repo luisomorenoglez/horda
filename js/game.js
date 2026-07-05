@@ -26,6 +26,9 @@ const ENEMIES = {
   ghost: { hp: 2, speed: 70, dmg: 8, points: 10, kamikaze: true },
   grunt: { hp: 4, speed: 59, dmg: 5, points: 20, kamikaze: false },
   demon: { hp: 6, speed: 48, dmg: 6, points: 50, kamikaze: false, ranged: true },
+  lobber: { hp: 3, speed: 42, dmg: 7, points: 30, kamikaze: false, lob: true },
+  sorcerer: { hp: 4, speed: 78, dmg: 6, points: 40, kamikaze: false, blink: true },
+  ogre: { hp: 14, speed: 30, dmg: 12, points: 80, kamikaze: false, big: true },
   death: { hp: 9999, speed: 62, dmg: 0, points: 0, kamikaze: false, drain: true },
 };
 
@@ -51,6 +54,7 @@ export function newGame(classId) {
     items: [],
     shots: [],
     enemyShots: [],
+    particles: [],
     map: null,
     fireCooldown: 0,
     drainAcc: 0,
@@ -79,13 +83,13 @@ export function nextLevel(g) {
   g.items = [];
   g.levelBanner = 2000;
 
-  const hpScale = 1 + (g.depth - 1) * 0.18;
+  const hpScale = 1 + (g.depth - 1) * 0.22;
   for (const s of lvl.spawns.generators) {
     g.generators.push({
       x: (s.x + 0.5) * TILE, y: (s.y + 0.5) * TILE,
       kind: s.kind, hp: 3 + Math.floor(g.depth / 3),
       timer: 1500 + Math.random() * 2000,
-      rate: Math.max(1400, 3200 - g.depth * 180),
+      rate: Math.max(1000, 3200 - g.depth * 220),
     });
   }
   for (const s of lvl.spawns.items) {
@@ -97,18 +101,21 @@ export function nextLevel(g) {
   if (g.depth > 1) sfx.level();
 }
 
-function spawnEnemy(g, kind, x, y, hpScale = 1 + (g.depth - 1) * 0.18) {
-  if (g.enemies.length >= MAX_ENEMIES) return;
+function spawnEnemy(g, kind, x, y, hpScale = 1 + (g.depth - 1) * 0.22) {
+  // La horda crece con la profundidad.
+  if (g.enemies.length >= Math.min(60, MAX_ENEMIES + g.depth * 2)) return;
   const base = ENEMIES[kind];
   g.enemies.push({
-    kind, x, y, size: ENEMY_SIZE,
+    kind, x, y, size: base.big ? 26 : ENEMY_SIZE,
     hp: Math.round(base.hp * hpScale),
-    speed: base.speed * (1 + (g.depth - 1) * 0.04),
+    speed: base.speed * (1 + (g.depth - 1) * 0.05),
     dmg: base.dmg, points: base.points,
     kamikaze: base.kamikaze, ranged: !!base.ranged,
+    lob: !!base.lob, blink: !!base.blink, big: !!base.big,
     drain: !!base.drain, drainLeft: 150, drainTick: 0,
     hitCd: 0, shootCd: 1000 + Math.random() * 1500,
     wobble: Math.random() * Math.PI * 2,
+    phase: Math.random() * 1600, hidden: false, flash: 0,
     face: "down", moving: false,
   });
 }
@@ -175,6 +182,7 @@ export function update(g, input, dt) {
   updateEnemies(g, dt);
   updateGenerators(g, dt);
   updateEnemyShots(g, dt);
+  updateParticles(g, dt);
   drainHealth(g, dt);
 
   g.hurtFlash = Math.max(0, g.hurtFlash - dt);
@@ -271,11 +279,13 @@ function updateShots(g, dt) {
     }
     let consumed = false;
     for (const e of g.enemies) {
+      if (e.hidden) continue; // el hechicero desvanecido es intocable
       if (Math.hypot(e.x - s.x, e.y - s.y) < e.size / 2 + 4) {
         if (e.drain) {
           sfx.clank(); // los disparos rebotan en la Muerte
         } else {
           e.hp -= g.cls.dmg;
+          e.flash = 120;
           sfx.hit();
         }
         consumed = true;
@@ -316,7 +326,9 @@ function updateShots(g, dt) {
 function reapDead(g) {
   for (let i = g.enemies.length - 1; i >= 0; i--) {
     if (g.enemies[i].hp <= 0) {
-      g.score += g.enemies[i].points;
+      const e = g.enemies[i];
+      g.score += e.points;
+      spawnPoof(g, e.x, e.y);
       g.enemies.splice(i, 1);
       sfx.kill();
     }
@@ -337,6 +349,13 @@ function updateEnemies(g, dt) {
     const e = g.enemies[i];
     const dist = Math.hypot(p.x - e.x, p.y - e.y);
     e.moving = false;
+    e.flash = Math.max(0, e.flash - dt);
+
+    // el hechicero se desvanece a intervalos mientras caza
+    if (e.blink) {
+      e.phase = (e.phase + dt) % 1600;
+      e.hidden = e.phase >= 900 && dist < TILE * 12;
+    }
 
     // contacto
     e.hitCd -= dt;
@@ -385,25 +404,35 @@ function updateEnemies(g, dt) {
         dx += Math.cos(e.wobble) * v * 0.5;
         dy += Math.sin(e.wobble) * v * 0.5;
       }
-      moveEntity(g, e, dx, dy);
-      e.moving = true;
-      e.face =
-        Math.abs(dx) >= Math.abs(dy)
-          ? (dx > 0 ? "right" : "left")
-          : (dy > 0 ? "down" : "up");
+      // el lanzador guarda las distancias: huye si te acercas
+      if (e.lob) {
+        if (dist < TILE * 3.5) { dx = -dx; dy = -dy; }
+        else if (dist < TILE * 6) { dx = 0; dy = 0; }
+      }
+      if (dx !== 0 || dy !== 0) {
+        moveEntity(g, e, dx, dy);
+        e.moving = true;
+        e.face =
+          Math.abs(dx) >= Math.abs(dy)
+            ? (dx > 0 ? "right" : "left")
+            : (dy > 0 ? "down" : "up");
+      }
     }
 
-    // demonios lanzan proyectiles
-    if (e.ranged && dist < TILE * 9) {
+    // demonios y lanzadores disparan; el lanzador tira por encima de los muros
+    if ((e.ranged || e.lob) && dist < TILE * 9) {
       e.shootCd -= dt;
       if (e.shootCd <= 0) {
-        e.shootCd = 1800;
+        e.shootCd = e.lob ? 2200 : 1800;
         const len = Math.hypot(p.x - e.x, p.y - e.y) || 1;
+        const speed = e.lob ? 190 : 230;
         g.enemyShots.push({
           x: e.x, y: e.y,
-          vx: ((p.x - e.x) / len) * 230,
-          vy: ((p.y - e.y) / len) * 230,
+          vx: ((p.x - e.x) / len) * speed,
+          vy: ((p.y - e.y) / len) * speed,
           dmg: e.dmg,
+          overWalls: e.lob,
+          ttl: e.lob ? 2000 : 3500,
         });
       }
     }
@@ -452,8 +481,13 @@ function updateEnemyShots(g, dt) {
     const s = g.enemyShots[i];
     s.x += (s.vx * dt) / 1000;
     s.y += (s.vy * dt) / 1000;
+    s.ttl = (s.ttl ?? 3500) - dt;
+    if (s.ttl <= 0) {
+      g.enemyShots.splice(i, 1);
+      continue;
+    }
     const t = tileAt(g.map, s.x, s.y);
-    if (t === T.WALL || t === T.DOOR) {
+    if (!s.overWalls && (t === T.WALL || t === T.DOOR)) {
       g.enemyShots.splice(i, 1);
       continue;
     }
@@ -501,4 +535,30 @@ function checkDeath(g) {
 
 function toast(g, text) {
   g.messages.push({ text, t: 1500 });
+}
+
+// Nubecilla de partículas al morir un enemigo.
+function spawnPoof(g, x, y) {
+  for (let i = 0; i < 6; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const v = 40 + Math.random() * 70;
+    g.particles.push({
+      x, y,
+      vx: Math.cos(a) * v, vy: Math.sin(a) * v,
+      t: 350 + Math.random() * 200,
+    });
+  }
+}
+
+function updateParticles(g, dt) {
+  for (let i = g.particles.length - 1; i >= 0; i--) {
+    const p = g.particles[i];
+    p.t -= dt;
+    if (p.t <= 0) {
+      g.particles.splice(i, 1);
+      continue;
+    }
+    p.x += (p.vx * dt) / 1000;
+    p.y += (p.vy * dt) / 1000;
+  }
 }

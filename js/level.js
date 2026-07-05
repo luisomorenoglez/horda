@@ -23,33 +23,37 @@ export function generateLevel(seed, depth) {
     rooms.push(room);
   }
 
-  const doors = [];
+  // Primero se excava TODO (pasillos y atajos); las puertas se deciden
+  // después, mirando el mapa final, para que nunca queden flotando.
+  const corridors = [];
   for (let i = 1; i < rooms.length; i++) {
     const a = rooms[i - 1];
     const b = rooms[i];
-    const doorSpot = carveCorridor(grid, rng, a.cx, a.cy, b.cx, b.cy);
-    // Puertas a partir de la 3ª sala; la llave irá en una sala anterior.
-    if (i >= 2 && doorSpot && rng() < 0.4) {
-      doors.push({ ...doorSpot, keyRoom: randInt(rng, 0, i - 1) });
-    }
+    corridors.push({ idx: i, path: carveCorridor(grid, rng, a.cx, a.cy, b.cx, b.cy) });
   }
-
-  // Un par de atajos entre salas lejanas (sin puertas) para que haya bucles.
   for (let i = 0; i < 2 && rooms.length > 5; i++) {
     const a = pick(rng, rooms);
     const b = pick(rng, rooms);
     if (a !== b) carveCorridor(grid, rng, a.cx, a.cy, b.cx, b.cy);
   }
 
-  for (const d of doors) {
-    if (grid[d.y][d.x] === T.FLOOR) grid[d.y][d.x] = T.DOOR;
+  // Puertas solo en cuellos de botella reales: suelo con muro a ambos
+  // lados perpendiculares y pasillo a ambos lados de paso.
+  const doors = [];
+  for (const c of corridors) {
+    if (c.idx < 2 || rng() >= 0.45) continue;
+    const candidates = c.path.slice(2, -2).filter((p) => isChokepoint(grid, p.x, p.y));
+    if (!candidates.length) continue;
+    const d = pick(rng, candidates);
+    doors.push({ x: d.x, y: d.y, keyRoom: randInt(rng, 0, c.idx - 1) });
   }
+  for (const d of doors) grid[d.y][d.x] = T.DOOR;
 
   const startRoom = rooms[0];
   const exitRoom = rooms[rooms.length - 1];
   grid[exitRoom.cy][exitRoom.cx] = T.EXIT;
 
-  // Poblar: generadores, comida, tesoro, llaves, pociones, enemigos sueltos.
+  // ---- poblar el nivel; la dificultad escala con la profundidad ----
   const spawns = { generators: [], items: [], enemies: [] };
   const used = new Set();
   const spot = (room) => {
@@ -70,18 +74,26 @@ export function generateLevel(seed, depth) {
     else grid[d.y][d.x] = T.FLOOR; // sin sitio para la llave: la puerta se abre sola
   }
 
-  const genChance = Math.min(0.85, 0.45 + depth * 0.06);
+  const genChance = Math.min(0.9, 0.5 + depth * 0.07);
+  const extraGenChance = depth >= 2 ? Math.min(0.6, 0.15 + depth * 0.05) : 0;
+  const foodChance = Math.max(0.22, 0.42 - depth * 0.02);
+  const maxWander = Math.min(4, 1 + Math.floor(depth / 2));
+
   for (let i = 1; i < rooms.length; i++) {
     const room = rooms[i];
     if (rng() < genChance) {
       const s = spot(room);
       if (s) spawns.generators.push({ ...s, kind: pickEnemyKind(rng, depth) });
     }
-    if (depth >= 3 && rng() < 0.3) {
+    if (rng() < extraGenChance) {
       const s = spot(room);
       if (s) spawns.generators.push({ ...s, kind: pickEnemyKind(rng, depth) });
     }
-    if (rng() < 0.4) {
+    if (depth >= 6 && rng() < 0.25) {
+      const s = spot(room);
+      if (s) spawns.generators.push({ ...s, kind: pickEnemyKind(rng, depth) });
+    }
+    if (rng() < foodChance) {
       const s = spot(room);
       if (s) spawns.items.push({ kind: "food", ...s });
     }
@@ -93,8 +105,8 @@ export function generateLevel(seed, depth) {
       const s = spot(room);
       if (s) spawns.items.push({ kind: "potion", ...s });
     }
-    // Enemigos ya deambulando al llegar.
-    const n = randInt(rng, 0, 2);
+    // Enemigos ya deambulando al llegar (más cuanto más hondo).
+    const n = randInt(rng, 0, maxWander);
     for (let j = 0; j < n; j++) {
       const s = spot(room);
       if (s) spawns.enemies.push({ ...s, kind: pickEnemyKind(rng, depth) });
@@ -117,11 +129,36 @@ export function generateLevel(seed, depth) {
   };
 }
 
+function isChokepoint(grid, x, y) {
+  if (grid[y][x] !== T.FLOOR) return false;
+  const wall = (xx, yy) => grid[yy]?.[xx] === T.WALL;
+  const open = (xx, yy) => grid[yy]?.[xx] === T.FLOOR;
+  return (
+    (wall(x, y - 1) && wall(x, y + 1) && open(x - 1, y) && open(x + 1, y)) ||
+    (wall(x - 1, y) && wall(x + 1, y) && open(x, y - 1) && open(x, y + 1))
+  );
+}
+
+// El bestiario se abre según bajas: cada pocas profundidades, un
+// horror nuevo entra en la rotación con más peso.
 function pickEnemyKind(rng, depth) {
-  const roll = rng();
-  if (depth >= 4 && roll < 0.25) return "demon";
-  if (depth >= 2 && roll < 0.55) return "grunt";
-  return roll < 0.5 ? "ghost" : "grunt";
+  const pool = [
+    ["ghost", 3],
+    ["grunt", 3],
+  ];
+  if (depth >= 2) pool.push(["lobber", 2]);
+  if (depth >= 3) pool.push(["demon", 2]);
+  if (depth >= 4) pool.push(["sorcerer", 2]);
+  if (depth >= 5) pool.push(["ogre", 1 + Math.min(2, Math.floor((depth - 5) / 2))]);
+
+  let total = 0;
+  for (const [, w] of pool) total += w;
+  let roll = rng() * total;
+  for (const [kind, w] of pool) {
+    roll -= w;
+    if (roll <= 0) return kind;
+  }
+  return "grunt";
 }
 
 function intersects(a, b, pad) {
@@ -136,23 +173,31 @@ function carveRoom(grid, room) {
     for (let x = room.x; x < room.x + room.w; x++) grid[y][x] = T.FLOOR;
 }
 
-// Devuelve el punto medio del pasillo (candidato a puerta).
+// Excava el pasillo en L y devuelve la lista ordenada de tiles del camino.
 function carveCorridor(grid, rng, x1, y1, x2, y2) {
-  const horizFirst = rng() < 0.5;
-  if (horizFirst) {
-    carveH(grid, x1, x2, y1);
-    carveV(grid, y1, y2, x2);
-    return { x: Math.floor((x1 + x2) / 2), y: y1 };
+  const path = [];
+  if (rng() < 0.5) {
+    carveH(grid, x1, x2, y1, path);
+    carveV(grid, y1, y2, x2, path);
+  } else {
+    carveV(grid, y1, y2, x1, path);
+    carveH(grid, x1, x2, y2, path);
   }
-  carveV(grid, y1, y2, x1);
-  carveH(grid, x1, x2, y2);
-  return { x: x1, y: Math.floor((y1 + y2) / 2) };
+  return path;
 }
 
-function carveH(grid, x1, x2, y) {
-  for (let x = Math.min(x1, x2); x <= Math.max(x1, x2); x++) grid[y][x] = T.FLOOR;
+function carveH(grid, x1, x2, y, path) {
+  const step = x2 >= x1 ? 1 : -1;
+  for (let x = x1; x !== x2 + step; x += step) {
+    grid[y][x] = T.FLOOR;
+    path.push({ x, y });
+  }
 }
 
-function carveV(grid, y1, y2, x) {
-  for (let y = Math.min(y1, y2); y <= Math.max(y1, y2); y++) grid[y][x] = T.FLOOR;
+function carveV(grid, y1, y2, x, path) {
+  const step = y2 >= y1 ? 1 : -1;
+  for (let y = y1; y !== y2 + step; y += step) {
+    grid[y][x] = T.FLOOR;
+    path.push({ x, y });
+  }
 }

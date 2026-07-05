@@ -37,6 +37,21 @@ body {
 .hud span:last-child { font-size: 18px; font-weight: bold; color: var(--gold); }
 #hud-hp { color: #60c060 !important; }
 #hud-hero canvas { display: block; margin-top: 2px; image-rendering: pixelated; }
+
+#btn-pause {
+  align-self: center;
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--gold);
+  font-family: inherit;
+  font-weight: bold;
+  font-size: 14px;
+  width: 34px;
+  height: 34px;
+  cursor: pointer;
+  letter-spacing: 1px;
+}
+#btn-pause:hover { border-color: var(--gold); }
 #hud-hp.low { color: var(--blood) !important; animation: blink 0.6s infinite; }
 
 @keyframes blink { 50% { opacity: 0.3; } }

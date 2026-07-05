@@ -29,9 +29,16 @@ export function render(ctx, g, time) {
       const t = g.map[ty][tx];
       const dx = tx * TILE - camX;
       const dy = ty * TILE - camY;
-      if (t === T.WALL) ctx.drawImage(getTile("wall", TILE, theme), dx, dy);
-      else {
-        ctx.drawImage(getTile("floor", TILE, theme), dx, dy);
+      const h = (tx * 7 + ty * 13) % 11; // hash barato para variar tiles
+      if (t === T.WALL) {
+        ctx.drawImage(getTile("wall", TILE, theme), dx, dy);
+        // antorchas en algunos muros que dan a suelo
+        if (h === 3 && ty + 1 < MAP_H && g.map[ty + 1][tx] !== T.WALL) {
+          drawTorch(ctx, dx + TILE / 2, dy + TILE * 0.55, time + tx * 331);
+        }
+      } else {
+        const variant = h === 0 ? "floor_a" : h === 1 ? "floor_b" : "floor";
+        ctx.drawImage(getTile(variant, TILE, theme), dx, dy);
         if (t === T.DOOR) ctx.drawImage(getTile("door", TILE, theme), dx, dy);
         else if (t === T.EXIT) ctx.drawImage(getTile("exit", TILE, theme), dx, dy);
       }
@@ -52,13 +59,30 @@ export function render(ctx, g, time) {
 
   // enemigos: animados al andar, mirando hacia donde van
   for (const e of g.enemies) {
+    if (e.hidden) {
+      // el hechicero desvanecido deja apenas un espejismo
+      ctx.globalAlpha = 0.1;
+    }
     const frame = e.moving ? Math.floor(time / 150) % 2 : 0;
     const eBob = e.kind === "ghost" ? bob : e.moving && frame === 1 ? -1 : 0;
+    const s = e.big ? SPRITE * 1.3 : SPRITE;
+    if (e.flash > 0) {
+      try { ctx.filter = "brightness(2.4)"; } catch (_) { /* sin filtro */ }
+    }
     ctx.drawImage(
       getCharSprite(e.kind, e.face, frame, SPRITE),
-      e.x - SPRITE / 2 - camX,
-      e.y - SPRITE / 2 - camY + eBob
+      e.x - s / 2 - camX,
+      e.y - s / 2 - camY + eBob,
+      s, s
     );
+    ctx.filter = "none";
+    ctx.globalAlpha = 1;
+  }
+
+  // partículas de las bajas
+  for (const p of g.particles) {
+    ctx.fillStyle = `rgba(232, 200, 120, ${Math.min(1, p.t / 300)})`;
+    ctx.fillRect(p.x - 2 - camX, p.y - 2 - camY, 4, 4);
   }
 
   // disparos: el arma de cada héroe girando en el aire
@@ -74,8 +98,9 @@ export function render(ctx, g, time) {
     ctx.restore();
   }
   const fireball = getWeapon("fire", 16);
+  const lobball = getWeapon("lob", 16);
   for (const s of g.enemyShots) {
-    ctx.drawImage(fireball, s.x - 8 - camX, s.y - 8 - camY);
+    ctx.drawImage(s.overWalls ? lobball : fireball, s.x - 8 - camX, s.y - 8 - camY);
   }
 
   // jugador: animado, mirando a su dirección (parpadea al recibir daño)
@@ -131,4 +156,15 @@ export function renderHud(g) {
 
 function clamp(v, min, max) {
   return Math.max(min, Math.min(max, v));
+}
+
+// Antorcha decorativa con llama que titila.
+function drawTorch(ctx, x, y, t) {
+  ctx.fillStyle = "#6a4a24";
+  ctx.fillRect(x - 1.5, y, 3, 8);
+  const flick = 1 + Math.sin(t / 90) * 0.35;
+  ctx.fillStyle = "#f0a030";
+  ctx.fillRect(x - 3, y - 5 * flick, 6, 5 * flick);
+  ctx.fillStyle = "#f8e070";
+  ctx.fillRect(x - 1.5, y - 3 * flick, 3, 3 * flick);
 }
